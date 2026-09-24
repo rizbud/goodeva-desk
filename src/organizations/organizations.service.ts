@@ -9,7 +9,7 @@ export class OrganizationsService {
   async findOrganizationByApiKey(apiKey: string) {
     const apiKeyHash = createHash('sha256').update(apiKey).digest('hex');
 
-    const organization = await this.prismaService.organization.findUnique({
+    return this.prismaService.organization.findUnique({
       select: {
         id: true,
         name: true,
@@ -18,7 +18,5 @@ export class OrganizationsService {
       },
       where: { apiKey: apiKeyHash },
     });
-
-    return organization;
   }
 }
