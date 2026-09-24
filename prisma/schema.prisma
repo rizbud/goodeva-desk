@@ -45,4 +45,8 @@ model Ticket {
   status         TicketStatus    @default(OPEN)
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([organizationId], name: "idx_ticket_organization_id")
+  @@index([organizationId, status], name: "idx_ticket_organization_id_status")
+  @@index([organizationId, category], name: "idx_ticket_organization_id_category")
 }
