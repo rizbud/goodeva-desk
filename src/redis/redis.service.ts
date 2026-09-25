@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { default as Redis } from 'ioredis';
 
 @Injectable()
@@ -6,8 +7,11 @@ export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private readonly redisClient: Redis.default;
 
-  constructor() {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  constructor(private readonly configService: ConfigService) {
+    const redisUrl = this.configService.get<string>(
+      'REDIS_URL',
+      'redis://localhost:6379',
+    );
     this.redisClient = new Redis.default(redisUrl, { lazyConnect: false });
 
     this.redisClient.on('connect', () => {

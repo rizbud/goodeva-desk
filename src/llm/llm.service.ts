@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service.js';
 import { generateText, Output } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -10,15 +11,29 @@ import { LlmClassificationResult } from './llm.type.js';
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
   private readonly cacheTtl = 24 * 60 * 60; // Cache for 24 hours
-  private readonly customOpenAi = createOpenAICompatible({
-    baseURL:
-      process.env.LLM_API_BASE_URL ||
-      'https://generativelanguage.googleapis.com/v1beta/openai',
-    name: 'custom-openai-compatible',
-    apiKey: process.env.LLM_API_KEY || '',
-  });
+  private readonly customOpenAi: ReturnType<typeof createOpenAICompatible>;
+  private readonly modelId: string;
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly configService: ConfigService,
+  ) {
+    const baseURL = this.configService.get<string>(
+      'LLM_API_BASE_URL',
+      'https://generativelanguage.googleapis.com/v1beta/openai',
+    );
+    const apiKey = this.configService.getOrThrow<string>('LLM_API_KEY');
+    this.modelId = this.configService.get<string>(
+      'LLM_MODEL_ID',
+      'gemini-2.5-flash-lite',
+    );
+
+    this.customOpenAi = createOpenAICompatible({
+      baseURL,
+      name: 'custom-openai-compatible',
+      apiKey,
+    });
+  }
 
   private sanitizeInput(input: string): string {
     return input.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase();
@@ -69,9 +84,7 @@ export class LlmService {
     try {
       const startTime = Date.now();
       const result = await generateText({
-        model: this.customOpenAi.chatModel(
-          process.env.LLM_MODEL_ID || 'gemini-2.5-flash-lite',
-        ),
+        model: this.customOpenAi.chatModel(this.modelId),
         prompt: this.buildPrompt(subject, message),
         output: Output.object({
           schema: z.object({
