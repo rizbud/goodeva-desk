@@ -8,6 +8,11 @@ Goodeva Desk adalah backend customer support desk multi-tenant yang dibangun den
 - [Menjalankan project](#menjalankan-project)
   - [Opsi 1: Docker Compose (direkomendasikan)](#opsi-1-docker-compose-direkomendasikan)
   - [Opsi 2: Menjalankan secara lokal](#opsi-2-menjalankan-secara-lokal)
+- [Endpoint API](#endpoint-api)
+  - [Swagger](#swagger)
+  - [Daftar endpoint](#daftar-endpoint)
+  - [Contoh request](#contoh-request)
+  - [Respons error](#respons-error)
 - [Provider LLM](#provider-llm)
 - [Keputusan desain](#keputusan-desain)
   - [Skema data dan multi-tenant](#skema-data-dan-multi-tenant)
@@ -190,6 +195,120 @@ Opsi ini tidak butuh PostgreSQL atau Redis terpasang di komputer host.
    npm run build
    npm run start:prod
    ```
+
+## Endpoint API
+
+### Swagger
+
+Saat aplikasi berjalan, Swagger UI tersedia di [http://localhost:3000/docs](http://localhost:3000/docs). Spesifikasi OpenAPI-nya bisa diambil dari `/docs-json` atau `/docs-yaml`, misalnya untuk diimpor ke Postman atau Insomnia.
+
+Untuk mencoba endpoint tiket dari Swagger UI, klik tombol Authorize lalu isi API key hasil seed.
+
+### Daftar endpoint
+
+| Method | Path | Butuh `x-api-key` | Keterangan |
+|---|---|---|---|
+| `GET` | `/health` | Tidak | Status database dan Redis. `200` kalau keduanya up, `503` kalau salah satunya down. Tidak kena rate limit. |
+| `POST` | `/tickets` | Ya | Membuat tiket dan mengantrekan klasifikasi LLM. Mengembalikan `201`. |
+| `GET` | `/tickets` | Ya | Daftar tiket dengan filter dan pagination. |
+| `GET` | `/tickets/:id` | Ya | Detail satu tiket. |
+| `PATCH` | `/tickets/:id/status` | Ya | Mengubah status tiket. |
+| `DELETE` | `/tickets/:id` | Ya | Menghapus tiket secara permanen dan mengembalikan data tiket yang dihapus. |
+
+Semua endpoint `/tickets` hanya melihat tiket milik organisasi pemilik API key. Tiket organisasi lain dianggap tidak ada dan menghasilkan `404`.
+
+Body `POST /tickets`:
+
+| Field | Tipe | Aturan |
+|---|---|---|
+| `customerEmail` | string | Email valid |
+| `subject` | string | 1–255 karakter |
+| `message` | string | 1–5000 karakter |
+
+Query `GET /tickets` (semuanya opsional):
+
+| Parameter | Keterangan |
+|---|---|
+| `status` | `OPEN`, `IN_PROGRESS`, atau `CLOSED` |
+| `category` | `GENERAL`, `BILLING`, atau `TECHNICAL` |
+| `customerEmail` | Filter berdasarkan email pelanggan |
+| `page` | Default `1` |
+| `limit` | Default `10`, maksimal `100` |
+
+Body `PATCH /tickets/:id/status` berisi `{ "status": "IN_PROGRESS" }` dengan nilai `OPEN`, `IN_PROGRESS`, atau `CLOSED`. Nilai `status` dan `category` tidak case-sensitive, jadi `in_progress` juga diterima.
+
+Field lain di luar yang tercantum di atas akan dibuang oleh `ValidationPipe`.
+
+### Contoh request
+
+Membuat tiket:
+
+```bash
+curl -X POST http://localhost:3000/tickets \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: sk_gd_xxxxxxxxxxxx" \
+  -d '{
+    "customerEmail": "budi@example.com",
+    "subject": "Tagihan dobel bulan ini",
+    "message": "Saya ditagih dua kali untuk langganan bulan September."
+  }'
+```
+
+Respons `201`. Nilai `category` dan `suggestedReply` masih `null` sampai worker selesai memprosesnya:
+
+```json
+{
+  "id": "cmfz0abc1000008l4h2x9d3k1",
+  "organizationId": "cmfyzq8k0000008l4a1b2c3d4",
+  "customerEmail": "budi@example.com",
+  "subject": "Tagihan dobel bulan ini",
+  "message": "Saya ditagih dua kali untuk langganan bulan September.",
+  "category": null,
+  "suggestedReply": null,
+  "status": "OPEN",
+  "createdAt": "2026-09-25T10:00:00.000Z",
+  "updatedAt": "2026-09-25T10:00:00.000Z"
+}
+```
+
+Mengambil daftar tiket billing yang masih open:
+
+```bash
+curl "http://localhost:3000/tickets?status=OPEN&category=BILLING&page=1&limit=10" \
+  -H "x-api-key: sk_gd_xxxxxxxxxxxx"
+```
+
+Respons daftar tiket dibungkus dengan info pagination:
+
+```jsonc
+{
+  "data": [ /* tiket, urut dari yang terbaru */ ],
+  "page": 1,
+  "limit": 10,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+### Respons error
+
+Error memakai format standar NestJS:
+
+```json
+{
+  "statusCode": 401,
+  "message": "Invalid API key",
+  "error": "Unauthorized"
+}
+```
+
+| Status | Kapan terjadi |
+|---|---|
+| `400` | Body atau query tidak lolos validasi. `message` berisi daftar pesan error. |
+| `401` | Header `x-api-key` tidak ada, atau API key tidak valid. |
+| `404` | Tiket tidak ditemukan atau milik organisasi lain. |
+| `429` | Melebihi rate limit per IP atau per API key. |
+| `503` | `GET /health` saat database atau Redis down. |
 
 ## Provider LLM
 
