@@ -15,8 +15,19 @@ services:
     networks:
       - goodeva-desk_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: goodeva-desk_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - goodeva-desk_network
+
 volumes:
   postgres-data:
+  redis-data:
 
 networks:
   goodeva-desk_network:

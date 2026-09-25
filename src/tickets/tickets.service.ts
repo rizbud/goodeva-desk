@@ -2,14 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ListTicketsQueryDto } from './dto/list-tickets-query.dto.js';
-import { TicketStatus } from '../../generated/prisma/enums.js';
+import { TicketCategory, TicketStatus } from '../../generated/prisma/enums.js';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
+import { LlmClassificationRequest } from '../llm/llm.type.js';
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    @InjectQueue('ticket-classification')
+    private readonly ticketClassificationQueue: Queue<LlmClassificationRequest>,
+  ) {}
 
   async create(organizationId: string, createTicketDto: CreateTicketDto) {
-    return this.prismaService.ticket.create({
+    const ticket = await this.prismaService.ticket.create({
       data: {
         organizationId: organizationId,
         customerEmail: createTicketDto.customerEmail,
@@ -17,6 +24,14 @@ export class TicketsService {
         message: createTicketDto.message,
       },
     });
+
+    await this.ticketClassificationQueue.add('classify-ticket', {
+      ticketId: ticket.id,
+      subject: createTicketDto.subject,
+      message: createTicketDto.message,
+    });
+
+    return ticket;
   }
 
   async findAll(
@@ -64,10 +79,27 @@ export class TicketsService {
     });
   }
 
+  async findOneById(id: string) {
+    return this.prismaService.ticket.findUnique({
+      where: { id: id },
+    });
+  }
+
   async updateStatus(id: string, organizationId: string, status: TicketStatus) {
     return this.prismaService.ticket.update({
       where: { id: id, organizationId: organizationId },
       data: { status },
+    });
+  }
+
+  async updateCategoryAndSuggestedReply(
+    id: string,
+    category: TicketCategory,
+    suggestedReply: string,
+  ) {
+    return this.prismaService.ticket.update({
+      where: { id: id },
+      data: { category, suggestedReply },
     });
   }
 

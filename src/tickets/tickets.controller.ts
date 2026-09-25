@@ -27,11 +27,7 @@ export class TicketsController {
     @CurrentOrg('id') organizationId: string,
     @Body() createTicketDto: CreateTicketDto,
   ) {
-    try {
-      return this.ticketsService.create(organizationId, createTicketDto);
-    } catch {
-      throw new InternalServerErrorException('Failed to create ticket');
-    }
+    return this.ticketsService.create(organizationId, createTicketDto);
   }
 
   @Get()
@@ -51,6 +47,7 @@ export class TicketsController {
     if (!ticket) {
       throw new NotFoundException('Resource not found');
     }
+    return ticket;
   }
 
   @Patch(':id/status')
