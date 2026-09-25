@@ -12,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goodeva -d goodeva_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - goodeva-desk_network
 
@@ -22,6 +27,40 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - goodeva-desk_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goodeva-desk_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://goodeva:goodeva@postgres:5432/goodeva_db
+      - REDIS_URL=redis://redis:6379
+      - LLM_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+      - LLM_API_KEY=
+      - LLM_MODEL_ID=gemini-2.5-flash-lite
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - goodeva-desk_network
 
