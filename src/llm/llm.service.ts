@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import { RedisService } from '../redis/redis.service.js';
 import { generateText, Output } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -35,16 +36,16 @@ export class LlmService {
     });
   }
 
-  private sanitizeInput(input: string): string {
-    return input.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase();
+  private normalizeText(text: string): string {
+    return text.toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
   private buildCacheKey(subject: string, message: string): string {
-    const sanitizedSubject = this.sanitizeInput(subject);
-    const sanitizedMessage = this.sanitizeInput(message);
-    const key = `llm:${sanitizedSubject}:${sanitizedMessage}`;
-
-    return key;
+    const normSubject = this.normalizeText(subject);
+    const normMessage = this.normalizeText(message);
+    const normalized = `${normSubject}:::${normMessage}`;
+    const hash = createHash('sha256').update(normalized).digest('hex');
+    return `llm:${hash}`;
   }
 
   private buildPrompt(subject: string, message: string): string {
@@ -86,6 +87,7 @@ export class LlmService {
       const result = await generateText({
         model: this.customOpenAi.chatModel(this.modelId),
         prompt: this.buildPrompt(subject, message),
+        abortSignal: AbortSignal.timeout(30_000),
         output: Output.object({
           schema: z.object({
             category: z.enum(TicketCategory),
