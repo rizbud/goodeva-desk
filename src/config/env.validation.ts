@@ -12,6 +12,10 @@ export const envSchema = z.object({
     .default('https://generativelanguage.googleapis.com/v1beta/openai'),
   LLM_API_KEY: z.string().min(1, 'LLM_API_KEY is required'),
   LLM_MODEL_ID: z.string().default('gemini-2.5-flash-lite'),
+  THROTTLE_IP_TTL: z.coerce.number().default(60),
+  THROTTLE_IP_LIMIT: z.coerce.number().default(60),
+  THROTTLE_ORG_TTL: z.coerce.number().default(60),
+  THROTTLE_ORG_LIMIT: z.coerce.number().default(120),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

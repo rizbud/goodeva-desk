@@ -8,6 +8,7 @@ const mockRedisClient = {
   del: vi.fn(),
   flushall: vi.fn(),
   ping: vi.fn(),
+  multi: vi.fn(),
   quit: vi.fn(),
   on: vi.fn(),
 };
@@ -78,6 +79,26 @@ describe('RedisService', () => {
       mockRedisClient.ping.mockResolvedValue('PONG');
       const result = await service.ping();
       expect(result).toBe('PONG');
+    });
+
+    it('should increment a fixed window atomically', async () => {
+      const tx = {
+        set: vi.fn().mockReturnThis(),
+        incr: vi.fn().mockReturnThis(),
+        pttl: vi.fn().mockReturnThis(),
+        exec: vi.fn().mockResolvedValue([
+          [null, 'OK'],
+          [null, 1],
+          [null, 60000],
+        ]),
+      };
+      mockRedisClient.multi.mockReturnValue(tx);
+
+      const result = await service.incrementWindow('key1', 60000);
+
+      expect(tx.set).toHaveBeenCalledWith('key1', 0, 'PX', 60000, 'NX');
+      expect(tx.incr).toHaveBeenCalledWith('key1');
+      expect(result).toEqual([1, 60000]);
     });
 
     it('should disconnect on destroy', async () => {

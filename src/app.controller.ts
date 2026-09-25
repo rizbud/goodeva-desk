@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { AppService } from './app.service.js';
 
 @ApiTags('health')
@@ -13,6 +14,7 @@ export class AppController {
   }
 
   @Get('health')
+  @SkipThrottle({ ip: true, org: true })
   @ApiOperation({ summary: 'Application and dependencies health check' })
   @ApiResponse({
     status: 200,

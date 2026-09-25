@@ -51,6 +51,16 @@ export class RedisService implements OnModuleDestroy {
     return await this.redisClient.ping();
   }
 
+  async incrementWindow(key: string, ttlMs: number): Promise<[number, number]> {
+    const results = await this.redisClient
+      .multi()
+      .set(key, 0, 'PX', ttlMs, 'NX')
+      .incr(key)
+      .pttl(key)
+      .exec();
+    return [results![1][1] as number, results![2][1] as number];
+  }
+
   async onModuleDestroy() {
     await this.redisClient.quit();
   }
