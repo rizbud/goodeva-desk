@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service.js';
 import { generateText, Output } from 'ai';
@@ -51,16 +50,24 @@ export class LlmService {
     const cachedResult = await this.redisService.get(cacheKey);
     if (cachedResult) {
       try {
-        return JSON.parse(cachedResult);
+        const parsed = JSON.parse(cachedResult) as LlmClassificationResult;
+        this.logger.log(`Cache hit for key ${cacheKey}`);
+        return parsed;
       } catch (error) {
-        // If parsing fails, log the error and continue to generate a new result
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         this.logger.error(
-          `Failed to parse cached result for key ${cacheKey}: ${error}`,
+          `Failed to parse cached result for key ${cacheKey}: ${errorMessage}`,
         );
       }
     }
 
+    this.logger.log(
+      `Cache miss for key ${cacheKey}. Requesting LLM completion...`,
+    );
+
     try {
+      const startTime = Date.now();
       const result = await generateText({
         model: this.customOpenAi.chatModel(
           process.env.LLM_MODEL_ID || 'gemini-2.5-flash-lite',
@@ -74,7 +81,11 @@ export class LlmService {
         }),
       });
 
+      const duration = Date.now() - startTime;
       const { category, suggestedReply } = result.output;
+      this.logger.log(
+        `LLM classified ticket in ${duration}ms as ${category}`,
+      );
 
       await this.redisService.set(
         cacheKey,
@@ -84,8 +95,10 @@ export class LlmService {
 
       return { category, suggestedReply };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Error classifying ticket with subject: "${subject}" and message: "${message}": ${error}`,
+        `Error classifying ticket with subject: "${subject}" and message: "${message}": ${errorMessage}`,
       );
       throw error;
     }

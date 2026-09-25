@@ -9,8 +9,8 @@ import {
   UseGuards,
   Query,
   NotFoundException,
-  InternalServerErrorException,
 } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { TicketsService } from './tickets.service.js';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { ApiKeyGuard } from '../auth/api-key/api-key.guard.js';
@@ -18,6 +18,8 @@ import { CurrentOrg } from '../auth/current-org.decorator.js';
 import { ListTicketsQueryDto } from './dto/list-tickets-query.dto.js';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto.js';
 
+@ApiTags('tickets')
+@ApiSecurity('x-api-key')
 @UseGuards(ApiKeyGuard)
 @Controller('tickets')
 export class TicketsController {
@@ -56,11 +58,7 @@ export class TicketsController {
     @Param('id') id: string,
     @Body() { status }: UpdateTicketStatusDto,
   ) {
-    try {
-      return this.ticketsService.updateStatus(id, organizationId, status);
-    } catch {
-      throw new InternalServerErrorException('Failed to update ticket status');
-    }
+    return this.ticketsService.updateStatus(id, organizationId, status);
   }
 
   @Delete(':id')

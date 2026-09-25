@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreateTicketDto } from './dto/create-ticket.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ListTicketsQueryDto } from './dto/list-tickets-query.dto.js';
@@ -9,6 +9,8 @@ import { LlmClassificationRequest } from '../llm/llm.type.js';
 
 @Injectable()
 export class TicketsService {
+  private readonly logger = new Logger(TicketsService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     @InjectQueue('ticket-classification')
@@ -30,6 +32,10 @@ export class TicketsService {
       subject: createTicketDto.subject,
       message: createTicketDto.message,
     });
+
+    this.logger.log(
+      `Created ticket ${ticket.id} for organization ${organizationId}. Queued classification job.`,
+    );
 
     return ticket;
   }
@@ -86,10 +92,12 @@ export class TicketsService {
   }
 
   async updateStatus(id: string, organizationId: string, status: TicketStatus) {
-    return this.prismaService.ticket.update({
+    const updated = await this.prismaService.ticket.update({
       where: { id: id, organizationId: organizationId },
       data: { status },
     });
+    this.logger.log(`Updated status of ticket ${id} to ${status}`);
+    return updated;
   }
 
   async updateCategoryAndSuggestedReply(
@@ -97,10 +105,14 @@ export class TicketsService {
     category: TicketCategory,
     suggestedReply: string,
   ) {
-    return this.prismaService.ticket.update({
+    const updated = await this.prismaService.ticket.update({
       where: { id: id },
       data: { category, suggestedReply },
     });
+    this.logger.log(
+      `Updated classification for ticket ${id}: category=${category}`,
+    );
+    return updated;
   }
 
   async remove(id: string, organizationId: string) {
