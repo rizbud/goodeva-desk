@@ -24,6 +24,9 @@ RUN apk add --no-cache openssl libc6-compat
 ENV NODE_ENV=production
 ENV PORT=3000
 
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
+
 USER node
 
 COPY --chown=node:node --from=builder /app/package*.json ./
@@ -38,4 +41,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "dist/src/main"]

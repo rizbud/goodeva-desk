@@ -46,9 +46,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://goodeva:goodeva@postgres:5432/goodeva_db
       - REDIS_URL=redis://redis:6379
-      - LLM_API_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-      - LLM_API_KEY=
-      - LLM_MODEL_ID=gemini-2.5-flash-lite
+      - LLM_API_BASE_URL=${LLM_API_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL_ID=${LLM_MODEL_ID:-gemini-2.5-flash-lite}
       - PORT=3000
     depends_on:
       postgres:
